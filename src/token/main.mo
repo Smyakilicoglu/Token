@@ -3,6 +3,7 @@ import Text "mo:base/Text";
 import Nat "mo:base/Nat";
 import Principal "mo:base/Principal";
 import Debug "mo:base/Debug";
+import Iter "mo:base/Iter";
 
 //HashMap kullanarak kimin tokenlerden ne kadar para kazandığını öğrenmemiz gerekir.
 //https://internetcomputer.org/docs/current/motoko/main/base/HashMap
@@ -14,11 +15,13 @@ actor Token {
     var totalSupply : Nat = 1000000000;
     var symbol: Text = "TSD"; //Para birimi sembolü
 
-    var balances = HashMap.HashMap<Principal, Nat>(1, Principal.equal, Principal.hash); //Ben ve miktar bağlantı halinde olmalıyız.
+    private stable var balancesEntries: [(Principal, Nat)] = [];
+    //balances'de stable hatası giderme paranın sabit durumda kalması gerek her dağıtıma çıktığında.
+    private var balances = HashMap.HashMap<Principal, Nat>(1, Principal.equal, Principal.hash); //Ben ve miktar bağlantı halinde olmalıyız.
 
     //owner = Sahip ana anahtar totalSupply (toplam arz) = değer
     //Ana para bakiye defetine eklendi.
-    balances.put(owner, totalSupply);
+    
 
     //Bakiyeler defterinde kişi kontrolü.
     public query func BalanceOf(who: Principal): async Nat {
@@ -40,8 +43,13 @@ actor Token {
         Debug.print(debug_show(msg.caller)); //dfx canister call token payOut //ipryq-wpxu3-ons7g-juuk3-5j37o-yfpfy-zj3nq-2wkb7-jxzoq-yjkun-qae
         if (balances.get(msg.caller) == null) {
             let amount = 10000;
-            balances.put(msg.caller, amount);
-               return "Seccess"; //2vxsx-fae
+            //balances.put(msg.caller, amount);
+            let result = await transfer(msg.caller, amount);
+            return result; //Charge the Canister readme
+            //kodlamak  yerine para transferi yaptık. 
+            //içerisinde para olmazsa para talep edemeyiz
+            //rrkah-fqaaa-aaaaa-aaaaq-cai
+               //return "Seccess"; //2vxsx-fae
         } else {
             return "Already Clamied"
         }
@@ -65,5 +73,17 @@ actor Token {
             return "Insufficient Funds"
         }
         //let result = await payOut(); //rrkah-fqaaa-aaaaa-aaaaq-cai
+    };
+
+    //balances stable devamı.
+    system func preupgrade() {
+        balancesEntries := Iter.toArray(balances.entries())
+    };
+
+    system func postupgrade() {
+        balances := HashMap.fromIter<Principal, Nat>(balancesEntries.vals(), 1, Principal.equal, Principal.hash);
+        if (balances.size() > 1) {
+            balances.put(owner, totalSupply);
+        }
     }
 };
