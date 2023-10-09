@@ -24,6 +24,7 @@ actor Token {
     
 
     //Bakiyeler defterinde kişi kontrolü.
+
     public query func BalanceOf(who: Principal): async Nat {
 
         let balance: Nat = switch (balances.get(who)) {
